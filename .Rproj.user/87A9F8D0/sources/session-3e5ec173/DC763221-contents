@@ -1,0 +1,16 @@
+# Load necessary libraries
+library(gargle)
+library(googlesheets4)
+
+
+
+# Authenticate with Google Sheets using the JSON file
+token <- gargle::credentials_service_account(
+  path = json_file_path,
+  scopes = "https://www.googleapis.com/auth/spreadsheets"
+)
+gs4_auth(token = token)
+
+# Example of how to use the authenticated session
+# sheet <- gs4_get("your_google_sheet_id")
+# sheet_data <- read_sheet(sheet)

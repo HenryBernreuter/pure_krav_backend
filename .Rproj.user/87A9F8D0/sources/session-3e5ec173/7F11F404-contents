@@ -1,0 +1,382 @@
+# Load necessary libraries
+library(shiny)
+library(bslib)
+library(rhandsontable)
+library(googlesheets4)
+library(data.table)
+library(jsonlite)
+
+# Load the JSON file
+json_data <- fromJSON("config/purekravmaga-615bc46de387.json")
+
+# Write the JSON data to a temporary file for authentication
+temp_file <- tempfile(fileext = ".json")
+write(toJSON(json_data, auto_unbox = TRUE, pretty = TRUE), temp_file)
+
+# Authenticate using the temporary file
+token <- gargle::credentials_service_account(
+  path = temp_file,
+  scopes = "https://www.googleapis.com/auth/spreadsheets"
+)
+
+# Authenticate with Google Sheets API
+gs4_auth(token = token)
+
+# Cleanup: remove the temporary file if necessary
+unlink(temp_file)
+
+# Specify the Google Sheet URLs or IDs
+sheet_urls <- c(
+  "https://docs.google.com/spreadsheets/d/1i-AXePhIg7vCL3sEnJrSt8JrmjclSWBkkxCLJQ80Em8/edit?usp=sharing",
+  "https://docs.google.com/spreadsheets/d/1uyd1wTrEq87EylRseN5Vf9IIB_DSqHy4wowYbojz7Wo/edit?usp=sharing",
+  "https://docs.google.com/spreadsheets/d/1s4f3b4pRdDslO16Rgx1n_W-YvOuQfl4IAqAEKKMS3es/edit?usp=sharing",
+  "https://docs.google.com/spreadsheets/d/1okURfyO9pEEJB8renSvJdG6PrQOq1mEFVlfEGT8PT0s/edit?usp=sharing",
+  "https://docs.google.com/spreadsheets/d/1LZEtpv2nweBERmMjpkqOviLSIgy9McWHBjGZKlfZnYw/edit?usp=sharing"
+)
+
+# Read the Google Sheets into data frames and convert to data.tables
+data_tables <- lapply(sheet_urls, function(url) {
+  df <- read_sheet(url)
+  as.data.table(df)
+})
+
+# Assign data.tables to variables
+debt <- data_tables[[1]]
+waviers <- data_tables[[2]]
+leads <- data_tables[[3]]
+dt4 <- data_tables[[4]]
+dt5 <- data_tables[[5]]
+
+# Check if each data.table is not empty and print the result
+for (i in seq_along(data_tables)) {
+  if (nrow(data_tables[[i]]) > 0) {
+    print(paste("dt", i, "is not empty", sep = ""))
+  } else {
+    print(paste("dt", i, "is empty", sep = ""))
+  }
+}
+
+# Define UI
+ui <- navbarPage(
+  title = "Pure Krav Maga Admin",
+  theme = bs_theme(
+    bg = "#FFFFFF", # Background color
+    fg = "#000000"  # Foreground color
+  ),
+  
+
+  tabPanel(
+    "Leads",
+    fluidPage(
+      h2("Leads"),
+      fluidRow(
+        column(4, offset = 4,
+               textInput("first_name", "First Name"),
+               textInput("last_name", "Last Name"),
+               textInput("phone_number", "Phone Number"),
+               textInput("email_address", "Email Address"),
+               actionButton("submit_lead", "Submit")
+        )
+      ),
+      
+    )
+  ),
+  
+  tabPanel(
+    "Schedule Your First Class",
+    fluidPage(
+      h2("Schedule Your First Class"),
+      tabsetPanel(
+        tabPanel(
+          "Adults",
+          fluidPage(
+            selectInput("adults_time", "Select Class Time for Adults", choices = c(
+              "Monday 7:15pm", 
+              "Tuesday 9:45am", "Tuesday 6:15pm", 
+              "Thursday 9:45am", "Thursday 6:15pm", 
+              "Saturday 8:45am")),
+            actionButton("schedule_adult", "Schedule Class")
+          )
+        ),
+        tabPanel(
+          "Kids",
+          fluidPage(
+            selectInput("kids_time", "Select Class Time for Kids", choices = c(
+              "Monday 4:15pm", 
+              "Tuesday 11:00am", "Tuesday 5:15pm", 
+              "Wednesday 4:15pm", 
+              "Thursday 5:15pm", 
+              "Saturday 9:45am")),
+            actionButton("schedule_kids", "Schedule Class")
+          )
+        ),
+        tabPanel(
+          "Teens",
+          fluidPage(
+            selectInput("teens_time", "Select Class Time for Teens", choices = c(
+              "Monday 4:15pm", "Monday 7:15pm", 
+              "Tuesday 11:00am", "Tuesday 5:15pm", "Tuesday 6:15pm", 
+              "Wednesday 4:15pm", 
+              "Thursday 5:15pm", "Thursday 6:15pm", 
+              "Saturday 8:45am", "Saturday 9:45am")),
+            actionButton("schedule_teens", "Schedule Class")
+          )
+        ),
+        tabPanel(
+          "Women Only",
+          fluidPage(
+            selectInput("women_time", "Select Class Time for Women", choices = c(
+              "Monday 7:15pm", 
+              "Tuesday 9:45am", "Tuesday 6:15pm", 
+              "Thursday 9:45am", "Thursday 6:15pm", 
+              "Saturday 8:45am")),
+            actionButton("schedule_women", "Schedule Class")
+          )
+        )
+      )
+    )
+  ),
+  
+  tabPanel(
+    "Waviers",
+    fluidPage(
+      h2("Waviers"),
+      rHandsontableOutput("table2"),
+      actionButton("save2", "Save Changes")
+    )
+  ),
+  
+  tabPanel(
+    "Debt",
+    fluidPage(
+      tags$head(
+        tags$style(HTML("
+          body {
+            background-image: url('www/background.jpg');
+            background-size: cover;
+          }
+        "))
+      ),
+      h2("Debt"),
+      rHandsontableOutput("table1"),
+      actionButton("save1", "Save Changes")
+    )
+  ),
+  
+  tabPanel(
+    "Attendance",
+    fluidPage(
+      h2("Attendance"),
+      tabsetPanel(
+        tabPanel(
+          "Monday Classes",
+          fluidRow(
+            column(12, 
+                   actionButton("mon_kids", "Mon Kids", style = "background-color: blue; color: white;"),
+                   actionButton("mon_int", "Mon Int", style = "background-color: blue; color: white;"),
+                   actionButton("mon_teens", "Mon Teens", style = "background-color: blue; color: white;"),
+                   actionButton("mon_fndtns", "Mon Fndtns", style = "background-color: blue; color: white;")
+            )
+          )
+        ),
+        tabPanel(
+          "Tuesday Classes",
+          fluidRow(
+            column(12, 
+                   actionButton("tues_home", "Tues Home", style = "background-color: blue; color: white;"),
+                   actionButton("tues_kids", "Tues Kids", style = "background-color: blue; color: white;"),
+                   actionButton("tues_teens", "Tues Teens", style = "background-color: blue; color: white;"),
+                   actionButton("tues_fndtns", "Tues Fndtns", style = "background-color: blue; color: white;"),
+                   actionButton("tues_int", "Tues Int", style = "background-color: blue; color: white;")
+            )
+          )
+        ),
+        tabPanel(
+          "Wednesday Classes",
+          fluidRow(
+            column(12, 
+                   actionButton("weds_kids", "Weds Kids", style = "background-color: blue; color: white;"),
+                   actionButton("ladies", "Ladies", style = "background-color: blue; color: white;")
+            )
+          )
+        ),
+        tabPanel(
+          "Thursday Classes",
+          fluidRow(
+            column(12, 
+                   actionButton("th_kids", "Th Kids", style = "background-color: blue; color: white;"),
+                   actionButton("th_teens", "Th Teens", style = "background-color: blue; color: white;"),
+                   actionButton("th_fndtns", "Th Fndtns", style = "background-color: blue; color: white;"),
+                   actionButton("th_int", "Th Int", style = "background-color: blue; color: white;")
+            )
+          )
+        ),
+        tabPanel(
+          "Saturday Classes",
+          fluidRow(
+            column(12, 
+                   actionButton("sat_all", "Sat All", style = "background-color: blue; color: white;"),
+                   actionButton("sat_kids", "Sat Kids", style = "background-color: blue; color: white;"),
+                   actionButton("sat_comfit", "Sat ComFit", style = "background-color: blue; color: white;")
+            )
+          )
+        )
+      ),
+      fluidRow(
+        column(12, 
+               selectInput("member_select", "Select Member", choices = c("Member 1", "Member 2", "Member 3"))
+        )
+      ),
+      actionButton("add_attendance", "Add Attendance")
+    )
+  ),
+  tabPanel(
+    "Sales",
+    fluidPage(
+      h2("Sales"),
+      rHandsontableOutput("table3"),
+      actionButton("save3", "Save Changes")
+      
+    )
+  ),
+)
+
+# Define server logic
+server <- function(input, output, session) {
+  
+  observeEvent(input$submit_lead, {
+    
+      # Read the existing leads data from the Google Sheet and convert it to a data.table
+      sheet_data <- as.data.table(read_sheet(sheet_urls[3]))
+      
+      # Get the column names and types from the Google Sheet data.table
+      sheet_columns <- colnames(sheet_data)
+      sheet_types <- sapply(sheet_data, class)
+      
+      # Convert the input data to a data.table
+      new_lead <- data.table(
+        first_name = input$first_name,
+        last_name = input$last_name,
+        phone_number = input$phone_number,
+        email_address = input$email_address
+      )
+      
+      new_lead$first_class = NA
+      # Ensure the new lead data.table has the same columns as the Google Sheet
+      new_lead <- new_lead[, ..sheet_columns, with = FALSE]
+      
+      # Combine the existing data with the new lead
+      leads <- rbindlist(list(sheet_data, new_lead), fill = TRUE)
+    
+      # Write the updated leads data back to the Google Sheet
+      sheet_write(leads, ss = sheet_urls[3], sheet = "leads_data")  # Adjust the sheet name if necessary
+      
+      # Clear input fields after submission
+      updateTextInput(session, "first_name", value = "")
+      updateTextInput(session, "last_name", value = "")
+      updateTextInput(session, "phone_number", value = "")
+      updateTextInput(session, "email_address", value = "")
+      
+      # Confirm submission
+      showModal(modalDialog(
+        title = "Success",
+        "Lead has been successfully added.",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    
+  })
+  
+  output$table1 <- renderRHandsontable({
+    rhandsontable(debt)
+  })
+  output$table2 <- renderRHandsontable({
+    rhandsontable(waviers)
+  })
+  output$table3 <- renderRHandsontable({
+    rhandsontable(leads)
+  })
+  
+  observeEvent(input$save1, {
+    if (!is.null(input$table1)) {
+      debt <- hot_to_r(input$table1)
+      sheet_write(debt, ss = sheet_urls[1], sheet = "Sheet1")
+    }
+  })
+  
+  observeEvent(input$save2, {
+    if (!is.null(input$table2)) {
+      # Read the Google Sheet and convert it to a data.table
+      sheet_data <- as.data.table(read_sheet(sheet_urls[2]))
+      
+      # Get the column names and types from the Google Sheet data.table
+      sheet_columns <- colnames(sheet_data)
+      sheet_types <- sapply(sheet_data, class)
+      
+      # Convert the input data to a data.table
+      input_data <- input$table2$data
+      waviers <- data.table::rbindlist(lapply(input_data, as.data.table), fill = TRUE)
+      
+      # Ensure the input values match the expected types
+      for (col in sheet_columns) {
+        if (!col %in% colnames(waviers)) {
+          waviers[, (col) := NA]  # Add missing columns with NA values
+        } else {
+          # Convert the column to the expected type
+          if (sheet_types[col] == "character") {
+            waviers[, (col) := as.character(get(col))]
+          } else if (sheet_types[col] == "numeric") {
+            waviers[, (col) := as.numeric(get(col))]
+          } else if (sheet_types[col] == "integer") {
+            waviers[, (col) := as.integer(get(col))]
+          } else if (sheet_types[col] == "logical") {
+            waviers[, (col) := as.logical(get(col))]
+          } else if (sheet_types[col] %in% c("POSIXct", "POSIXt")) {
+            waviers[, (col) := as.POSIXct(get(col))]
+          }
+        }
+      }
+      
+      # Reorder the columns to match the Google Sheet
+      #waviers <- waviers[, ..sheet_columns]
+      browser()
+      # Write the data back to the Google Sheet
+      sheet_write(waviers, ss = sheet_urls[2], sheet = "Sheet1")
+    }
+  })
+  
+  observeEvent(input$save3, {
+    if (!is.null(input$table3)) {
+      leads <- hot_to_r(input$table3)
+      sheet_write(leads, ss = sheet_urls[3], sheet = "Sheet1")
+    }
+  })
+  
+  observeEvent(input$schedule_adult, {
+    selected_class <- input$adults_time
+    # Logic to add selected_class for the lead into Google Sheet
+  })
+  
+  observeEvent(input$schedule_kids, {
+    selected_class <- input$kids_time
+    # Logic to add selected_class for the lead into Google Sheet
+  })
+  
+  observeEvent(input$schedule_teens, {
+    selected_class <- input$teens_time
+    # Logic to add selected_class for the lead into Google Sheet
+  })
+  
+  observeEvent(input$schedule_women, {
+    selected_class <- input$women_time
+    # Logic to add selected_class for the lead into Google Sheet
+  })
+  
+  observeEvent(input$add_attendance, {
+    selected_member <- input$member_select
+    # Logic to update the database with the selected member's attendance
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
